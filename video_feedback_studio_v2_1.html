@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video Feedback Studio v2.1 — Time‑coded Notes</title>
+<style>
+  :root {
+    --bg1:#070b18; --bg2:#0f172a; --card:#0b1220; --border:rgba(148,163,184,.28); --muted:#94a3b8;
+    --text:#e5e7eb; --btn:#2563eb; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; --accent:#38bdf8; --pink:#f472b6;
+    --pillbg:#0ea5e9; --pilltxt:#06243a;
+  }
+  html,body{height:100%}
+  body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Arial;color:var(--text);
+       background: radial-gradient(1000px 540px at 15% -10%, var(--bg1), #04070d);}
+  .container{max-width:1200px;margin:0 auto;padding:20px}
+  h1{margin:0 0 8px;font-size:28px;font-weight:800;letter-spacing:.2px}
+  .lead{opacity:.85;margin:0 0 14px}
+  .panel{background:linear-gradient(180deg, rgba(15,23,42,.8), rgba(2,6,23,.8)); border:1px solid var(--border); border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .row{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+  @media (max-width: 980px){ .row{grid-template-columns:1fr} }
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px}
+  .btn{background:#1f2b5a;color:#fff;border:1px solid rgba(255,255,255,.09);padding:10px 14px;border-radius:12px;cursor:pointer;
+       font-weight:700;letter-spacing:.2px;display:inline-flex;gap:8px;align-items:center;transition:transform .05s ease, filter .15s ease, background .2s}
+  .btn:hover{filter:brightness(1.05)} .btn:active{transform:translateY(1px)}
+  .btn.alt{background:linear-gradient(135deg,var(--btn),#1d4ed8)} .btn.warn{background:linear-gradient(135deg,var(--warn),#d97706)}
+  .btn.ghost{background:#111827} .btn.danger{background:linear-gradient(135deg,var(--danger),#b91c1c)}
+  .btn.secondary{background:#0b1220}
+  .field{background:#0b1220;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+  .pill{display:flex;gap:10px;align-items:center;background:#0b1220;border:1px solid var(--border);padding:8px 12px;border-radius:999px}
+  kbd{background:#111827;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+  .status{font-size:12px;opacity:.88;margin-left:auto}
+  .playerWrap{padding:12px}
+  .video{width:100%;max-height:58vh;background:#000;border-radius:14px}
+  .timeline{position:relative;height:12px;background:#0b1220;border:1px solid var(--border);border-radius:999px;margin:12px}
+  .marker{position:absolute;top:0;bottom:0;width:4px;background:var(--accent);border-radius:2px}
+  .marker:hover{background:#7dd3fc}
+  .noteform{padding:12px;border-top:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+  textarea{flex:1;min-height:72px;resize:vertical}
+  .notes{padding:14px;max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:12px}
+  .note{display:grid;grid-template-columns:92px 1fr auto;gap:14px;align-items:start;padding:12px;border:1px solid var(--border);border-radius:14px;
+        background:rgba(255,255,255,.03);transition:transform .06s ease, background .2s ease}
+  .note:hover{transform:translateY(-1px); background:rgba(56,189,248,.08)}
+  .badge{display:inline-flex;gap:6px;align-items:center;justify-content:center;font-size:12px;
+         background:var(--pillbg); color:var(--pilltxt); border:1px solid rgba(255,255,255,.25); padding:6px 10px;border-radius:999px;min-width:76px}
+  .noteText{line-height:1.4}
+  .muted{opacity:.75}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center}
+  .small{font-size:12px;opacity:.85}
+  .empty{opacity:.6;border:1px dashed var(--border);padding:16px;border-radius:12px;text-align:center}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .icon{width:18px;height:18px;display:inline-block}
+  .actions{display:flex;gap:8px}
+  .reply{margin-top:8px;padding:10px;border-radius:10px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25)}
+  .replyHead{display:flex;gap:8px;align-items:center;opacity:.85;font-size:12px;margin-bottom:4px}
+  .replyText{font-size:14px}
+  .replyBtn{margin-left:auto}
+  .stack{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Video Feedback Studio <span style="opacity:.7">v2.1</span></h1>
+  <p class="lead">Upload or paste a URL, play, and drop notes. Click a note or its timestamp to <b>seek & play</b>. Share a “Reviewer Mode” link to lock originals (UI-only lock) so the editor can only reply or resolve.</p>
+
+  <div class="row">
+    <div class="panel">
+      <div class="controls">
+        <div class="toolbar">
+          <input id="file" class="field" type="file" accept="video/*">
+          <input id="url" class="field" type="url" placeholder="Or paste video URL (MP4/WebM) and press Enter" style="min-width:320px">
+          <button id="loadUrl" class="btn secondary"><span class="icon">🔗</span>Load URL</button>
+          <button id="removeVideo" class="btn danger"><span class="icon">🗑️</span>Remove Video</button>
+        </div>
+        <div class="pill stack"><span>Shortcuts:</span> <kbd>N</kbd> new note • <kbd>Space</kbd> play/pause • <kbd>J/K</kbd> -/+1s • <kbd>←/→</kbd> seek</div>
+        <div class="status" id="status">No video loaded</div>
+      </div>
+
+      <div class="playerWrap">
+        <video id="video" class="video" controls preload="metadata"></video>
+        <div class="timeline" id="timeline"></div>
+      </div>
+
+      <div class="noteform">
+        <button id="grab" class="btn alt"><span class="icon">📝</span>Add Note @ <span id="now">00:00</span></button>
+        <textarea id="text" class="field" placeholder="Type your feedback/instruction (free text)…"></textarea>
+        <button id="save" class="btn"><span class="icon">💾</span>Save</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="controls" style="padding-bottom:0">
+        <div class="row2">
+          <div class="stack">
+            <h3 style="margin:6px 0">Notes</h3>
+            <span id="modeBadge" class="badge" style="display:none;background:#22c55e;color:#06240d">Reviewer Mode</span>
+          </div>
+          <div style="text-align:right" class="stack">
+            <button id="exportJson" class="btn secondary">Export JSON</button>
+            <button id="exportCsv" class="btn ghost">Export CSV</button>
+            <button id="importJson" class="btn ghost">Import</button>
+            <button id="shareLink" class="btn"><span class="icon">🔗</span>Share Link</button>
+            <button id="shareReviewLink" class="btn alt"><span class="icon">🔒</span>Share Reviewer Link</button>
+            <button id="clear" class="btn warn">Clear All</button>
+          </div>
+        </div>
+      </div>
+      <div class="notes" id="notes"></div>
+      <div id="emptyState" class="empty" style="display:none">No notes yet. Press <b>N</b> or “Add Note” while playing to drop your first note.</div>
+      <p class="small muted" style="padding:10px">Reviewer Mode is a **client‑side lock**: it hides edit/delete for original notes and allows replies + resolve. For tamper‑proof enforcement, host with a backend (roles/permissions).</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Utilities ----------
+const $ = s => document.querySelector(s);
+const fmt = t => {
+  if(!isFinite(t)) return "00:00";
+  const total = Math.max(0, Math.floor(t));
+  const h = Math.floor(total/3600), m = Math.floor((total%3600)/60), s2 = total%60;
+  return (h>0? String(h).padStart(2,'0')+':':'') + String(m).padStart(2,'0') + ':' + String(s2).padStart(2,'0');
+};
+function download(name, blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+function toCSV(rows){ return rows.map(r=>r.map(v=>`\"${String(v).replace(/\"/g,'\"\"')}\"`).join(',')).join('\\n'); }
+function base64(obj){ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); }
+function fromBase64(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
+
+// ---------- State ----------
+let project = { srcType:null, src:null, name:null, size:null, lastModified:null, duration:0, notes:[], replies:{} };
+// replies: { [noteId]: [{author, text, whenISO}] }
+let reviewerMode = false;
+
+const LSKEY = k => 'vfs21:'+k;
+
+// ---------- Elements ----------
+const video=$('#video'), file=$('#file'), urlInp=$('#url'), loadUrl=$('#loadUrl'), removeVideo=$('#removeVideo');
+const timeline=$('#timeline'), nowLbl=$('#now'), status=$('#status');
+const text=$('#text'), grab=$('#grab'), saveBtn=$('#save');
+const notesEl=$('#notes'), emptyState=$('#emptyState');
+const exportJson=$('#exportJson'), exportCsv=$('#exportCsv'), importJson=$('#importJson'), shareLink=$('#shareLink'), shareReviewLink=$('#shareReviewLink'), clearBtn=$('#clear');
+const modeBadge=$('#modeBadge');
+
+// ---------- Video loading / removal ----------
+file.addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const url = URL.createObjectURL(f);
+  video.src = url; video.load(); video.play().then(()=>video.pause()).catch(()=>{});
+  project = { srcType:'file', src:null, name:f.name, size:f.size, lastModified:f.lastModified, duration:0, notes:[], replies:{} };
+  loadAutosave();
+  status.textContent = 'Loaded file: '+f.name;
+  renderNotes(); renderMarkers();
+});
+function loadUrlNow(u){
+  if(!u) return;
+  video.src = u; video.crossOrigin='anonymous'; video.load();
+  project = { srcType:'url', src:u, name:u, size:null, lastModified:null, duration:0, notes:[], replies:{} };
+  loadAutosave();
+  status.textContent = 'Loaded URL';
+  renderNotes(); renderMarkers();
+}
+loadUrl.addEventListener('click', ()=>loadUrlNow((urlInp.value||'').trim()));
+urlInp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ loadUrlNow((urlInp.value||'').trim()); } });
+urlInp.addEventListener('paste', e=>{
+  setTimeout(()=>{ const v=(urlInp.value||'').trim(); try{ new URL(v); loadUrlNow(v);}catch(_){ } }, 10);
+});
+removeVideo.addEventListener('click', ()=>{
+  video.pause(); video.removeAttribute('src'); video.load();
+  project = { srcType:null, src:null, name:null, size:null, lastModified:null, duration:0, notes:[], replies:{} };
+  notesEl.innerHTML=''; timeline.innerHTML=''; emptyState.style.display='block';
+  // Clear only current project's key (not entire storage)
+  localStorage.removeItem(currentKey());
+  status.textContent='Video removed';
+});
+
+video.addEventListener('loadedmetadata', ()=>{
+  project.duration = video.duration||0; renderMarkers(); autosave();
+});
+video.addEventListener('timeupdate', ()=>{ nowLbl.textContent = fmt(video.currentTime); });
+video.addEventListener('play', ()=>autosave());
+
+// ---------- Notes (free text + resolve + edit + delete + replies in reviewer mode) ----------
+function addNote(t, content){
+  const id = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  project.notes.push({ id, t:Math.max(0,Math.min(project.duration||1e9, t)), text:content.trim(), resolved:false, author:'owner' });
+  project.notes.sort((a,b)=>a.t-b.t);
+  renderNotes(); renderMarkers(); autosave();
+}
+function addReply(noteId, text, author='editor'){
+  if(!project.replies[noteId]) project.replies[noteId]=[];
+  project.replies[noteId].push({ author, text, whenISO:new Date().toISOString() });
+  renderNotes(); autosave();
+}
+
+function renderNotes(){
+  notesEl.innerHTML='';
+  if(!project.notes.length){ emptyState.style.display='block'; return; }
+  emptyState.style.display='none';
+  for(const n of project.notes){
+    const row=document.createElement('div'); row.className='note'; if(n.resolved) row.style.opacity='.6';
+    row.addEventListener('click', (e)=>{ if(e.target.closest('button')) return; video.currentTime=n.t; video.play(); });
+    const tc=document.createElement('button'); tc.className='badge'; tc.textContent=fmt(n.t); tc.title='Seek & Play';
+    tc.onclick=(e)=>{ e.stopPropagation(); video.currentTime=n.t; video.play(); };
+    const body=document.createElement('div'); const txt=document.createElement('div'); txt.className='noteText'; txt.textContent=n.text; body.append(txt);
+    // actions
+    const actions=document.createElement('div'); actions.className='actions';
+    const btnResolve=document.createElement('button'); btnResolve.className='btn alt'; btnResolve.title='Mark resolved';
+    btnResolve.innerHTML='✓'; // checkmark icon only
+    btnResolve.onclick=(e)=>{ e.stopPropagation(); n.resolved=!n.resolved; renderNotes(); autosave(); };
+    const btnEdit=document.createElement('button'); btnEdit.className='btn ghost'; btnEdit.title='Edit note'; btnEdit.innerHTML='✏️';
+    btnEdit.onclick=(e)=>{ e.stopPropagation(); const val=prompt('Edit note text:', n.text); if(val!=null){ n.text=val; renderNotes(); autosave(); } };
+    const btnDel=document.createElement('button'); btnDel.className='btn danger'; btnDel.title='Delete note'; btnDel.innerHTML='🗑️';
+    btnDel.onclick=(e)=>{ e.stopPropagation(); project.notes = project.notes.filter(x=>x.id!==n.id); delete project.replies[n.id]; renderNotes(); renderMarkers(); autosave(); };
+
+    // Reviewer mode UI restrictions
+    if(reviewerMode && n.author==='owner'){
+      // In reviewer mode, hide edit/delete on original notes; allow resolve + Reply
+      btnEdit.style.display='none';
+      btnDel.style.display='none';
+    }
+
+    actions.append(btnResolve, btnEdit, btnDel);
+    // Replies (Reviewer Mode)
+    if(reviewerMode){
+      const replyWrap=document.createElement('div'); replyWrap.className='reply';
+      const head=document.createElement('div'); head.className='replyHead'; head.innerHTML='<span>Reply as editor</span>';
+      const input=document.createElement('input'); input.className='field'; input.placeholder='Add a short reason / update…'; input.style.flex='1';
+      const btnSend=document.createElement('button'); btnSend.className='btn'; btnSend.textContent='Reply'; btnSend.onclick=(e)=>{ e.stopPropagation(); const v=(input.value||'').trim(); if(!v) return; addReply(n.id, v, 'editor'); input.value=''; };
+      head.append(btnSend); replyWrap.append(head);
+      // existing replies
+      const list=document.createElement('div'); (project.replies[n.id]||[]).forEach(r=>{
+        const it=document.createElement('div'); it.className='replyText'; it.textContent=`— ${r.text}`; list.append(it);
+      });
+      replyWrap.append(list);
+      body.append(replyWrap);
+    } else {
+      // Show existing replies (if any) also to owner
+      const list=document.createElement('div'); (project.replies[n.id]||[]).forEach(r=>{
+        const it=document.createElement('div'); it.className='reply'; it.innerHTML=`<div class="replyHead"><span>${r.author||'editor'}</span><span class="muted">${new Date(r.whenISO).toLocaleString()}</span></div><div class="replyText">${r.text}</div>`;
+        body.append(it);
+      });
+    }
+
+    row.append(tc); row.append(body); row.append(actions);
+    notesEl.append(row);
+  }
+}
+function renderMarkers(){
+  timeline.innerHTML='';
+  const d=video.duration||0; if(!isFinite(d)||d<=0) return;
+  for(const n of project.notes){
+    const x=Math.max(0,Math.min(100,(n.t/d)*100));
+    const m=document.createElement('div'); m.className='marker'; m.style.left=`calc(${x}% - 2px)`; m.title=`${fmt(n.t)} — ${n.text}`;
+    m.onclick=()=>{ video.currentTime=n.t; video.play(); };
+    timeline.append(m);
+  }
+}
+
+// ---------- Autosave ----------
+function currentKey(){
+  if(project.srcType==='url') return LSKEY('url:'+project.src);
+  if(project.srcType==='file') return LSKEY('file:'+project.name+'|'+project.size+'|'+project.lastModified);
+  return null;
+}
+function autosave(){
+  const key=currentKey(); if(!key) return;
+  localStorage.setItem(key, JSON.stringify(project));
+}
+function loadAutosave(){
+  const key=currentKey(); if(!key) return;
+  const raw=localStorage.getItem(key);
+  if(raw){ try{ const p=JSON.parse(raw); if(p){ project.notes=p.notes||[]; project.replies=p.replies||{}; } }catch(e){} }
+  renderNotes(); renderMarkers();
+}
+
+// ---------- Export / Import / Share ----------
+exportJson.onclick=()=>{
+  const out = { meta:{ when:new Date().toISOString(), srcType:project.srcType, src:project.src, name:project.name, duration:project.duration }, notes:project.notes, replies:project.replies };
+  download((project.name||'video')+'_notes.json', new Blob([JSON.stringify(out,null,2)], {type:'application/json'}));
+};
+exportCsv.onclick=()=>{
+  const rows = [['timecode','seconds','resolved','text']].concat(project.notes.map(n=>[fmt(n.t), n.t, n.resolved?'yes':'no', n.text]));
+  download((project.name||'video')+'_notes.csv', new Blob([toCSV(rows)], {type:'text/csv'}));
+};
+importJson.onclick=()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
+  inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const dat=JSON.parse(rd.result); if(dat && Array.isArray(dat.notes)){ project.notes=dat.notes; project.replies=dat.replies||{}; renderNotes(); renderMarkers(); autosave(); } }catch(err){ alert('Invalid JSON'); } }; rd.readAsText(f); };
+  inp.click();
+};
+shareLink.onclick=()=>{
+  if(project.srcType==='url'){
+    const payload={ src:project.src, notes:project.notes, replies:project.replies };
+    const link = location.origin + location.pathname + '#v=' + base64(payload);
+    navigator.clipboard.writeText(link).then(()=>alert('Link copied! Send it to your editor.')).catch(()=>prompt('Copy this link:', link));
+  }else{
+    alert('For local files, export JSON and send it with the video file. Your editor can import the JSON in this HTML.');
+  }
+};
+shareReviewLink.onclick=()=>{
+  if(project.srcType!=='url'){ alert('Reviewer link works best with a URL-based video. For local files, share JSON instead.'); return; }
+  const payload={ src:project.src, notes:project.notes, replies:project.replies, mode:'review' };
+  const link = location.origin + location.pathname + '#v=' + base64(payload);
+  navigator.clipboard.writeText(link).then(()=>alert('Reviewer‑Mode link copied!')).catch(()=>prompt('Copy this link:', link));
+};
+clearBtn.onclick=()=>{
+  if(!confirm('Clear all notes?')) return;
+  project.notes=[]; project.replies={}; renderNotes(); renderMarkers(); autosave();
+};
+
+// ---------- Keyboard shortcuts ----------
+document.addEventListener('keydown', e=>{
+  if(e.target === text) return;
+  if(e.key === ' '){ e.preventDefault(); if(video.paused) video.play(); else video.pause(); }
+  if(e.key === 'n' || e.key==='N'){ e.preventDefault(); grab.click(); }
+  if(e.key === 'j' || e.key==='J' || e.key==='ArrowLeft'){ video.currentTime = Math.max(0,(video.currentTime||0)-1); }
+  if(e.key === 'k' || e.key==='K' || e.key==='ArrowRight'){ video.currentTime = Math.min(project.duration||1e9,(video.currentTime||0)+1); }
+});
+
+// ---------- Note buttons ----------
+grab.onclick=()=>{
+  const t=video.currentTime||0;
+  if(!text.value.trim()){ text.focus(); return; }
+  addNote(t, text.value); text.value='';
+};
+saveBtn.onclick=()=>grab.onclick();
+
+// ---------- Share-link loader ----------
+(function initFromHash(){
+  const h=location.hash.slice(1);
+  if(!h.startsWith('v=')) return;
+  const data=fromBase64(h.slice(2));
+  if(data && data.src){
+    urlInp.value=data.src; loadUrlNow(data.src);
+    project.notes = Array.isArray(data.notes)?data.notes:[];
+    project.replies = data.replies || {};
+    reviewerMode = (data.mode==='review');
+    if(reviewerMode){ modeBadge.style.display='inline-flex'; }
+    renderNotes(); renderMarkers();
+    status.textContent = reviewerMode ? 'Loaded Reviewer link' : 'Loaded shared link';
+  }
+})();
+</script>
+</body>
+</html>
