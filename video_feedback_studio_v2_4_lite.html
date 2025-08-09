@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video Feedback Studio v2.4 Lite — Stable Offline</title>
+<style>
+  :root {
+    --bg1:#070b18; --card:#0b1220; --border:rgba(148,163,184,.28); --muted:#94a3b8;
+    --text:#e5e7eb; --btn:#1f2b5a; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; --accent:#38bdf8;
+    --pillbg:#0ea5e9; --pilltxt:#06243a;
+  }
+  html,body{height:100%}
+  body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Arial;color:var(--text);
+       background: radial-gradient(1000px 540px at 15% -10%, var(--bg1), #04070d);}
+  .container{max-width:1200px;margin:0 auto;padding:18px}
+  h1{margin:0 0 8px;font-size:26px;font-weight:800;letter-spacing:.2px}
+  .lead{opacity:.85;margin:0 0 14px}
+  .panel{background:linear-gradient(180deg, rgba(15,23,42,.85), rgba(2,6,23,.85)); border:1px solid var(--border); border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .row{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+  @media (max-width: 1100px){ .row{grid-template-columns:1fr} }
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px}
+  .btn{background:var(--btn);color:#fff;border:1px solid rgba(255,255,255,.09);padding:10px 14px;border-radius:12px;cursor:pointer;
+       font-weight:700;letter-spacing:.2px;display:inline-flex;gap:8px;align-items:center;transition:transform .05s ease, filter .15s ease, background .2s}
+  .btn:hover{filter:brightness(1.05)} .btn:active{transform:translateY(1px)}
+  .btn.alt{background:linear-gradient(135deg,#2563eb,#1d4ed8)} .btn.warn{background:linear-gradient(135deg,var(--warn),#d97706)}
+  .btn.ghost{background:#111827} .btn.danger{background:linear-gradient(135deg,var(--danger),#b91c1c)}
+  .btn.secondary{background:#0b1220}
+  .field{background:#0b1220;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+  .status{font-size:12px;opacity:.88;margin-left:auto}
+  .playerWrap{padding:12px}
+  .video, .ytFrame{width:100%;max-height:56vh;background:#000;border-radius:14px}
+  .timeline{position:relative;height:12px;background:#0b1220;border:1px solid var(--border);border-radius:999px;margin:12px}
+  .marker{position:absolute;top:0;bottom:0;width:4px;background:var(--accent);border-radius:2px}
+  .noteform{padding:12px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-start}
+  textarea{flex:1;min-height:72px;resize:vertical}
+  .notes{padding:12px;max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .note{display:grid;grid-template-columns:100px 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.03)}
+  .badge{display:inline-flex;gap:6px;align-items:center;justify-content:center;font-size:12px;
+         background:var(--pillbg); color:var(--pilltxt); border:1px solid rgba(255,255,255,.25); padding:6px 10px;border-radius:999px;min-width:86px}
+  .actions{display:flex;gap:8px}
+  .muted{opacity:.75}
+  .small{font-size:12px;opacity:.85}
+  .empty{opacity:.6;border:1px dashed var(--border);padding:16px;border-radius:12px;text-align:center}
+  .history{margin-top:8px;padding:8px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.25);display:none}
+  .history ul{margin:6px 0 0 18px}
+  .history li{margin:3px 0}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Video Feedback Studio <span style="opacity:.7">v2.4 Lite</span></h1>
+  <p class="lead">Rock‑solid local version. Click a note to seek & <b>pause</b>. While typing, the player <b>pauses</b> and timestamp locks. YouTube works when hosted over HTTPS; from local file you’ll get a “Open at time” link fallback.</p>
+
+  <div class="row">
+    <!-- Player -->
+    <div class="panel">
+      <div class="controls">
+        <input id="file" class="field" type="file" accept="video/*">
+        <input id="url" class="field" type="url" placeholder="Paste direct MP4/WebM or YouTube link and press Enter" style="min-width:360px">
+        <button id="loadUrl" class="btn secondary">Load URL</button>
+        <button id="removeVideo" class="btn danger">Remove Video</button>
+        <div class="status" id="status">No video loaded</div>
+      </div>
+
+      <div class="playerWrap">
+        <video id="video" class="video" controls preload="metadata" style="display:none"></video>
+        <div id="ytWrap" style="display:none"><div id="yt" class="ytFrame"></div></div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+
+      <div class="noteform">
+        <button id="grab" class="btn alt">Add Note @ <span id="now">00:00</span></button>
+        <textarea id="text" class="field" placeholder="Type your feedback/instruction…"></textarea>
+        <button id="save" class="btn">Save</button>
+      </div>
+      <p class="small muted" style="padding:0 12px 12px">Tip: From a local file, YouTube precise seeking requires hosting (GitHub Pages/Netlify). This build shows a timestamp link fallback for YouTube when opened locally.</p>
+    </div>
+
+    <!-- Notes -->
+    <div class="panel">
+      <div class="controls" style="padding-bottom:0">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button id="exportJson" class="btn secondary">Export JSON</button>
+          <button id="exportCsv" class="btn ghost">Export CSV</button>
+          <button id="importJson" class="btn ghost">Import</button>
+          <button id="shareLink" class="btn">Share Link</button>
+          <button id="clear" class="btn warn">Clear All</button>
+        </div>
+      </div>
+      <div class="notes" id="notes"></div>
+      <div id="emptyState" class="empty" style="display:none">No notes yet. Press <b>Add Note</b> while playing or use <b>N</b>.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Helpers ----------
+const $ = s => document.querySelector(s);
+const fmt = t => {
+  if(!isFinite(t)) return "00:00";
+  const total = Math.max(0, Math.floor(t));
+  const h = Math.floor(total/3600), m = Math.floor((total%3600)/60), s2 = total%60;
+  return (h>0? String(h).padStart(2,'0')+':':'') + String(m).padStart(2,'0') + ':' + String(s2).padStart(2,'0');
+};
+function download(name, blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+function toCSV(rows){ return rows.map(r=>r.map(v=>`\"${String(v).replace(/\"/g,'\"\"')}\"`).join(',')).join('\\n'); }
+function base64(obj){ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); }
+function fromBase64(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
+function isYouTubeUrl(u){ return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(u); }
+
+// ---------- Player (HTML5 + conditional YouTube) ----------
+const videoEl = $('#video'); const ytWrap = $('#ytWrap'); let ytPlayer=null; let mode='none';
+function currentTime(){ if(mode==='yt' && ytPlayer && ytReady) return ytPlayer.getCurrentTime(); if(mode==='html5') return videoEl.currentTime||0; return 0; }
+function duration(){ if(mode==='yt' && ytPlayer && ytReady) return ytPlayer.getDuration(); if(mode==='html5') return videoEl.duration||0; return 0; }
+function pause(){ if(mode==='yt' && ytPlayer && ytReady) ytPlayer.pauseVideo(); if(mode==='html5') videoEl.pause(); }
+function seekTo(t){
+  if(mode==='yt'){
+    if(ytReady){ ytPlayer.seekTo(t, true); ytPlayer.pauseVideo(); }
+    else { /* fallback handled on note click by opening new tab with &t= */ }
+  } else if(mode==='html5'){ videoEl.currentTime=t; videoEl.pause(); }
+}
+function loadHTML5(url){ ytWrap.style.display='none'; videoEl.style.display='block'; mode='html5'; videoEl.src=url; videoEl.load(); }
+let ytReady=false;
+function loadYT(url){
+  // Only initialize API when running over http(s). From file://, we cannot use origin-based API reliably.
+  const isHttps = location.protocol.startsWith('http');
+  if(!isHttps){
+    ytWrap.style.display='block'; ytWrap.innerHTML = '<div style="padding:12px" class="small muted">YouTube exact seeking needs hosting (https). Use Share Link or host via GitHub Pages/Netlify, or click timestamps to open the YouTube page at that time.</div>';
+    mode='yt'; ytPlayer=null; ytReady=false; return;
+  }
+  videoEl.style.display='none'; ytWrap.style.display='block'; mode='yt';
+  const id = extractYtId(url);
+  if(!window.YT){
+    const tag=document.createElement('script'); tag.src='https://www.youtube.com/iframe_api'; document.body.appendChild(tag);
+    window.onYouTubeIframeAPIReady = ()=> createYtPlayer(id);
+  } else { createYtPlayer(id); }
+}
+function createYtPlayer(id){
+  if(ytPlayer){ try{ ytPlayer.destroy(); }catch(e){} }
+  ytPlayer = new YT.Player('yt', {
+    videoId:id, playerVars:{ rel:0, modestbranding:1, enablejsapi:1, origin:location.origin },
+    events:{ 'onReady': ()=>{ ytReady=true; pause(); } }
+  });
+}
+function extractYtId(u){
+  try{
+    const url=new URL(u);
+    if(url.hostname.includes('youtu.be')) return url.pathname.slice(1);
+    const id=url.searchParams.get('v'); if(id) return id;
+    const m=url.pathname.match(/\/embed\/([^\/\?]+)/); if(m) return m[1];
+  }catch(e){}
+  return u;
+}
+
+// ---------- State ----------
+let project = { srcType:null, src:null, name:null, size:null, lastModified:null, duration:0, notes:[] };
+// note: {id,t,text,resolved,history:[{type,atISO,meta}]}
+const LSKEY = k => 'vfs24:'+k;
+
+// ---------- Elements ----------
+const file=$('#file'), urlInp=$('#url'), loadUrl=$('#loadUrl'), removeVideo=$('#removeVideo');
+const timeline=$('#timeline'), nowLbl=$('#now'), status=$('#status');
+const text=$('#text'), grab=$('#grab'), saveBtn=$('#save');
+const notesEl=$('#notes'), emptyState=$('#emptyState');
+const exportJson=$('#exportJson'), exportCsv=$('#exportCsv'), importJson=$('#importJson'), shareLink=$('#shareLink'), clearBtn=$('#clear');
+
+// ---------- Video loading ----------
+file.addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const url=URL.createObjectURL(f);
+  loadHTML5(url);
+  project = { srcType:'file', src:null, name:f.name, size:f.size, lastModified:f.lastModified, duration:0, notes:[] };
+  loadAutosave();
+  status.textContent='Loaded file: '+f.name;
+  setTimeout(()=>pause(), 100);
+  renderNotes(); renderMarkers();
+});
+function loadUrlNow(u){
+  if(!u) return;
+  if(isYouTubeUrl(u)){ loadYT(u); project = { srcType:'url', src:u, name:u, size:null, lastModified:null, duration:0, notes:[] }; }
+  else { loadHTML5(u); project = { srcType:'url', src:u, name:u, size:null, lastModified:null, duration:0, notes:[] }; }
+  loadAutosave(); status.textContent='Loaded URL'; setTimeout(()=>pause(), 300);
+  renderNotes(); renderMarkers();
+}
+loadUrl.addEventListener('click', ()=>loadUrlNow((urlInp.value||'').trim()));
+urlInp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ loadUrlNow((urlInp.value||'').trim()); } });
+removeVideo.addEventListener('click', ()=>{
+  pause();
+  if(mode==='html5'){ videoEl.removeAttribute('src'); videoEl.load(); }
+  if(mode==='yt' && ytPlayer){ try{ ytPlayer.destroy(); }catch(e){} ytPlayer=null; ytReady=false; }
+  mode='none'; ytWrap.style.display='none'; videoEl.style.display='none';
+  project = { srcType:null, src:null, name:null, size:null, lastModified:null, duration:0, notes:[] };
+  notesEl.innerHTML=''; timeline.innerHTML=''; emptyState.style.display='block';
+  localStorage.removeItem(currentKey());
+  status.textContent='Video removed';
+});
+
+// Metadata/time label
+videoEl.addEventListener('loadedmetadata', ()=>{ project.duration=duration(); renderMarkers(); autosave(); });
+videoEl.addEventListener('timeupdate', ()=>{ nowLbl.textContent=fmt(currentTime()); });
+setInterval(()=>{ if(mode==='yt' && ytPlayer && ytReady){ nowLbl.textContent=fmt(currentTime()); } }, 250);
+
+// ---------- Notes + History ----------
+let lockedTime=null;
+function pushHistory(n, type, meta){ if(!n.history) n.history=[]; n.history.push({ type, atISO:new Date().toISOString(), meta:meta||{} }); }
+function addNote(t, content){
+  const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const note={ id, t:Math.max(0,Math.min(duration()||1e9, t)), text:content.trim(), resolved:false, history:[] };
+  pushHistory(note,'created',{ t:note.t, text:note.text });
+  project.notes.push(note); project.notes.sort((a,b)=>a.t-b.t);
+  renderNotes(); renderMarkers(); autosave();
+}
+function renderNotes(){
+  notesEl.innerHTML='';
+  if(!project.notes.length){ emptyState.style.display='block'; return; }
+  emptyState.style.display='none';
+  for(const n of project.notes){
+    const row=document.createElement('div'); row.className='note'; if(n.resolved) row.style.opacity='.6';
+    // seek & PAUSE on click
+    row.addEventListener('click', (e)=>{
+      if(e.target.closest('button') || e.target.closest('a')) return;
+      if(mode==='yt' && !ytReady){
+        // local file fallback for YouTube
+        const u=(project.src||''); const link = u.includes('?') ? u+'&t='+Math.floor(n.t) : u+'?t='+Math.floor(n.t);
+        window.open(link, '_blank');
+      } else { seekTo(n.t); }
+    });
+    const tc=document.createElement('button'); tc.className='badge'; tc.textContent=fmt(n.t); tc.title='Seek (paused)';
+    tc.onclick=(e)=>{ e.stopPropagation(); if(mode==='yt' && !ytReady){ const u=(project.src||''); const link = u.includes('?') ? u+'&t='+Math.floor(n.t) : u+'?t='+Math.floor(n.t); window.open(link,'_blank'); } else { seekTo(n.t); } };
+    const body=document.createElement('div'); const txt=document.createElement('div'); txt.textContent=n.text; body.append(txt);
+    // history
+    const histBtn=document.createElement('button'); histBtn.className='btn ghost'; histBtn.innerHTML='🕘 History'; histBtn.style.marginTop='8px';
+    const histBox=document.createElement('div'); histBox.className='history';
+    const list=document.createElement('ul'); (n.history||[]).forEach(h=>{
+      const li=document.createElement('li');
+      if(h.type==='created'){ li.textContent=`[${new Date(h.atISO).toLocaleString()}] Created at ${fmt(h.meta.t)}: "${h.meta.text}"`; }
+      else if(h.type==='edited'){ li.textContent=`[${new Date(h.atISO).toLocaleString()}] Edited: "${h.meta.old}" → "${h.meta.new}"`; }
+      else if(h.type==='resolved'){ li.textContent=`[${new Date(h.atISO).toLocaleString()}] Marked RESOLVED`; }
+      else if(h.type==='unresolved'){ li.textContent=`[${new Date(h.atISO).toLocaleString()}] Marked UNRESOLVED`; }
+      list.append(li);
+    });
+    if(!list.children.length){ const li=document.createElement('li'); li.textContent='No history yet.'; list.append(li); }
+    histBox.append(list); histBtn.onclick=(e)=>{ e.stopPropagation(); histBox.style.display = (histBox.style.display==='none'||!histBox.style.display) ? 'block' : 'none'; };
+    body.append(histBtn, histBox);
+
+    // actions
+    const actions=document.createElement('div'); actions.className='actions';
+    const btnResolve=document.createElement('button'); btnResolve.className='btn alt'; btnResolve.title='Resolve'; btnResolve.innerHTML='✓';
+    btnResolve.onclick=(e)=>{ e.stopPropagation(); n.resolved=!n.resolved; pushHistory(n, n.resolved?'resolved':'unresolved'); renderNotes(); autosave(); };
+    const btnEdit=document.createElement('button'); btnEdit.className='btn ghost'; btnEdit.title='Edit'; btnEdit.innerHTML='✏️';
+    btnEdit.onclick=(e)=>{ e.stopPropagation(); const val=prompt('Edit note text:', n.text); if(val!=null && val!==n.text){ pushHistory(n,'edited',{old:n.text,new:val}); n.text=val; renderNotes(); autosave(); } };
+    const btnDel=document.createElement('button'); btnDel.className='btn danger'; btnDel.title='Delete'; btnDel.innerHTML='🗑️';
+    btnDel.onclick=(e)=>{ e.stopPropagation(); if(!confirm('Delete this note?')) return; project.notes = project.notes.filter(x=>x.id!==n.id); renderNotes(); renderMarkers(); autosave(); };
+    row.append(tc); row.append(body); row.append(actions.appendChild(btnResolve).parentNode);
+    // actions.append returns node; we appended btnResolve, then return parent; fix:
+    actions.innerHTML=''; actions.append(btnResolve, btnEdit, btnDel);
+    row.replaceChild(actions, row.lastChild);
+    notesEl.append(row);
+  }
+}
+function renderMarkers(){
+  timeline.innerHTML='';
+  const d=duration()||0; if(!isFinite(d)||d<=0) return;
+  for(const n of project.notes){
+    const x=Math.max(0,Math.min(100,(n.t/d)*100));
+    const m=document.createElement('div'); m.className='marker'; m.style.left=`calc(${x}% - 2px)`; m.title=`${fmt(n.t)} — ${n.text}`;
+    m.onclick=()=>{ if(mode==='yt' && !ytReady){ const u=(project.src||''); const link = u.includes('?') ? u+'&t='+Math.floor(n.t) : u+'?t='+Math.floor(n.t); window.open(link,'_blank'); } else { seekTo(n.t); } };
+    timeline.append(m);
+  }
+}
+
+// ---------- Autosave ----------
+function currentKey(){
+  if(project.srcType==='url') return LSKEY('url:'+project.src);
+  if(project.srcType==='file') return LSKEY('file:'+project.name+'|'+project.size+'|'+project.lastModified);
+  return null;
+}
+function autosave(){ const key=currentKey(); if(!key) return; localStorage.setItem(key, JSON.stringify(project)); }
+function loadAutosave(){
+  const key=currentKey(); if(!key) return;
+  const raw=localStorage.getItem(key);
+  if(raw){ try{ const p=JSON.parse(raw); if(p){ project.notes=p.notes||[]; } }catch(e){} }
+  renderNotes(); renderMarkers();
+}
+
+// ---------- Export / Import / Share ----------
+exportJson.onclick=()=>{
+  const out = { meta:{ when:new Date().toISOString(), srcType:project.srcType, src:project.src, name:project.name, duration:duration() }, notes:project.notes };
+  download((project.name||'video')+'_notes.json', new Blob([JSON.stringify(out,null,2)], {type:'application/json'}));
+};
+exportCsv.onclick=()=>{
+  const rows = [['timecode','seconds','resolved','text']].concat(project.notes.map(n=>[fmt(n.t), n.t, n.resolved?'yes':'no', n.text]));
+  download((project.name||'video')+'_notes.csv', new Blob([toCSV(rows)], {type:'text/csv'}));
+};
+importJson.onclick=()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
+  inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const dat=JSON.parse(rd.result); if(dat && Array.isArray(dat.notes)){ project.notes=dat.notes; renderNotes(); renderMarkers(); autosave(); } }catch(err){ alert('Invalid JSON'); } }; rd.readAsText(f); };
+  inp.click();
+};
+shareLink.onclick=()=>{
+  if(project.srcType==='url'){
+    const slimNotes = project.notes.map(n=>({id:n.id,t:n.t,text:n.text,resolved:n.resolved}));
+    const payload={ src:project.src, notes:slimNotes };
+    const link = location.origin + location.pathname + '#v=' + base64(payload);
+    navigator.clipboard.writeText(link).then(()=>alert('Link copied!')).catch(()=>prompt('Copy this link:', link));
+  }else{
+    alert('For local files, export JSON and send it with the video file. Your editor can import the JSON in this HTML.');
+  }
+};
+clearBtn.onclick=()=>{ if(!confirm('Clear all notes?')) return; project.notes=[]; renderNotes(); renderMarkers(); autosave(); };
+
+// ---------- Keyboard shortcuts ----------
+document.addEventListener('keydown', e=>{
+  if(e.target === text) return;
+  if(e.key === ' '){ e.preventDefault(); if(mode==='html5'){ if(videoEl.paused) videoEl.play(); else videoEl.pause(); } else if(mode==='yt' && ytReady){ const st=ytPlayer.getPlayerState(); if(st===1) ytPlayer.pauseVideo(); else ytPlayer.playVideo(); } }
+  if(e.key === 'n' || e.key==='N'){ e.preventDefault(); grab.click(); }
+  if(e.key === 'j' || e.key==='J' || e.key==='ArrowLeft'){ const t=Math.max(0,(currentTime()||0)-1); seekTo(t); }
+  if(e.key === 'k' || e.key==='K' || e.key==='ArrowRight'){ const t=Math.min(duration()||1e9,(currentTime()||0)+1); seekTo(t); }
+});
+
+// ---------- Note buttons ----------
+saveBtn.onclick=()=>{
+  const content=(text.value||'').trim(); if(!content){ text.focus(); return; }
+  const t=(lockedTime!=null)?lockedTime:currentTime();
+  addNote(t, content); text.value=''; lockedTime=null;
+};
+grab.onclick=()=>{ lockedTime = currentTime(); pause(); nowLbl.textContent=fmt(lockedTime); text.focus(); };
+text.addEventListener('focus', ()=>{ lockedTime = currentTime(); pause(); nowLbl.textContent=fmt(lockedTime); });
+
+// ---------- Share-link loader ----------
+(function initFromHash(){
+  const h=location.hash.slice(1);
+  if(!h.startsWith('v=')) return;
+  const data=fromBase64(h.slice(2));
+  if(data && data.src){
+    document.getElementById('url').value=data.src; loadUrlNow(data.src);
+    project.notes = Array.isArray(data.notes)?data.notes:[];
+    renderNotes(); renderMarkers();
+    status.textContent = 'Loaded shared link';
+  }
+})();
+</script>
+</body>
+</html>
